@@ -1,27 +1,29 @@
-
 <!DOCTYPE html>
 <html lang="si">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Smart Eye for Blind</title>
+    <title>AI Smart Companion v6</title>
     <style>
-        body { font-family: sans-serif; background: #000; color: #fff; text-align: center; margin: 0; overflow: hidden; }
-        #video { width: 100vw; height: 70vh; object-fit: cover; border-bottom: 4px solid #00ffcc; }
-        .info-panel { height: 30vh; padding: 15px; background: #111; display: flex; flex-direction: column; justify-content: center; }
-        #status { font-size: 24px; color: #00ffcc; font-weight: bold; }
-        #description { font-size: 18px; color: #ccc; margin-top: 10px; }
-        .btn-start { background: #00ffcc; color: #000; border: none; padding: 20px; font-size: 22px; font-weight: bold; width: 90%; border-radius: 10px; margin-top: 10px; }
+        body { font-family: 'Segoe UI', sans-serif; background: #000; color: #fff; text-align: center; margin: 0; }
+        #video { width: 100vw; height: 60vh; object-fit: cover; border-bottom: 4px solid #8e44ad; }
+        .brain-box { height: 40vh; padding: 20px; background: #111; display: flex; flex-direction: column; justify-content: center; }
+        #ai-status { color: #8e44ad; font-weight: bold; letter-spacing: 1px; margin-bottom: 5px; }
+        #main-output { font-size: 26px; font-weight: bold; color: #fff; margin-bottom: 10px; }
+        #sub-output { font-size: 16px; color: #aaa; }
+        .btn-activate { background: #8e44ad; color: #fff; border: none; padding: 20px 50px; font-size: 20px; border-radius: 50px; font-weight: bold; cursor: pointer; transition: 0.3s; }
     </style>
 </head>
 <body>
 
     <video id="video" autoplay playsinline></video>
     
-    <div class="info-panel">
-        <div id="status">ඇස පණගන්වන්න...</div>
-        <div id="description">වටපිටාව විස්තර කිරීමට සූදානම්.</div>
-        <button class="btn-start" id="start-btn">ඇස පණගන්වන්න</button>
+    <div class="brain-box">
+        <div id="ai-status">AI පද්ධතිය ක්‍රියාත්මකයි</div>
+        <div id="main-output">මම සූදානම්.</div>
+        <div id="sub-output">ඇස පණගන්වා මට වටපිටාව පෙන්වන්න.</div>
+        <br>
+        <button id="start-btn" class="btn-activate">මොළය පණගන්වන්න</button>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
@@ -29,64 +31,72 @@
 
     <script>
         let model;
+        let lastMessage = "";
         const video = document.getElementById('video');
-        const statusText = document.getElementById('status');
-        const descText = document.getElementById('description');
+        const mainOut = document.getElementById('main-output');
+        const subOut = document.getElementById('sub-output');
         const startBtn = document.getElementById('start-btn');
 
-        async function initAI() {
-            statusText.innerText = "මොළය අවදි වෙමින්...";
+        async function init() {
+            mainOut.innerText = "බුද්ධිය අවදි වෙමින්...";
             model = await mobilenet.load();
-            statusText.innerText = "දැන් ඇස පණගන්වන්න";
+            mainOut.innerText = "මම දැන් සූදානම්.";
         }
 
         startBtn.addEventListener('click', async () => {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment" } 
-                });
-                video.srcObject = stream;
-                startBtn.style.display = 'none';
-                statusText.innerText = "පරීක්ෂා කරමින්...";
-                setInterval(analyzeFrame, 3000); // සෑම තත්පර 3කට වරක්ම වටපිටාව බලයි
-            } catch (err) {
-                alert("කැමරාව වැඩ නැත: " + err.message);
-            }
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            video.srcObject = stream;
+            startBtn.style.display = 'none';
+            setInterval(thinkAndSpeak, 4000); 
         });
 
-        async function analyzeFrame() {
+        async function thinkAndSpeak() {
             if (!model) return;
             const predictions = await model.classify(video);
-            
-            // ඉහළම ප්‍රතිඵලය ලබා ගැනීම
-            const topResult = predictions[0];
-            let message = "";
+            const top = predictions[0];
 
-            // සරල සිංහල පරිවර්තනය (උදාහරණ කිහිපයක්)
-            const label = topResult.className.toLowerCase();
-            
-            if(label.includes('money') || label.includes('paper')) {
-                message = "මුදල් නෝට්ටුවක් විය හැක";
-            } else if(label.includes('person') || label.includes('man')) {
-                message = "මිනිසෙකු පෙනේ";
-            } else if(label.includes('chair') || label.includes('table')) {
-                message = "ගෘහ භාණ්ඩ පෙනේ";
-            } else {
-                message = "මෙය " + topResult.className + " එකක් විය හැක";
+            if (top.probability > 0.5) {
+                const label = top.className.toLowerCase();
+                let result = analyzeContext(label);
+
+                if (result.main !== lastMessage) {
+                    mainOut.innerText = result.main;
+                    subOut.innerText = result.advice;
+                    speak(result.main + ". " + result.advice);
+                    lastMessage = result.main;
+                }
+            }
+        }
+
+        function analyzeContext(label) {
+            // ChatGPT වගේ තර්කානුකූලව සිතීම (Reasoning Logic)
+            if (label.includes('person') || label.includes('man')) {
+                return { main: "පුද්ගලයෙක් ඉදිරියේ සිටිනවා", advice: "ඔහු සමඟ කතා කිරීමට හෝ අවධානයෙන් සිටීමට පුළුවන්." };
+            }
+            if (label.includes('stairs') || label.includes('step')) {
+                return { main: "පඩිපෙළක් හමු වුණා", advice: "කරුණාකර පියවර තබන විට ප්‍රවේශම් වන්න." };
+            }
+            if (label.includes('car') || label.includes('truck') || label.includes('bus')) {
+                return { main: "වාහනයක් පෙනෙනවා", advice: "ඔබ පාරේ සිටී නම් ආරක්ෂිත තැනකට වන්න." };
+            }
+            if (label.includes('money') || label.includes('bill')) {
+                return { main: "මුදල් නෝට්ටුවක්", advice: "එහි වටිනාකම තහවුරු කර ගැනීමට තව ටිකක් ලං කරන්න." };
+            }
+            if (label.includes('door') || label.includes('entrance')) {
+                return { main: "දොරක් තිබෙනවා", advice: "ඔබට ඇතුල් වීමට අවශ්‍ය නම් ඉදිරියට යන්න." };
             }
 
-            descText.innerText = message;
-            speak(message);
+            let thing = label.split(',')[0];
+            return { main: "මම " + thing + " එකක් දකිනවා", advice: "මේ පිළිබඳ වැඩි විස්තර අවශ්‍යද?" };
         }
 
         function speak(text) {
-            const synth = window.speechSynthesis;
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = 'si-LK';
-            synth.speak(utterance);
+            window.speechSynthesis.speak(utterance);
         }
 
-        initAI();
+        init();
     </script>
 </body>
 </html>
