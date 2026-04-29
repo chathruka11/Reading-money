@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI ඇස - සම්පූර්ණ මුදල් අඳුනාගැනීමේ පද්ධතිය</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <style>
+        body { font-family: sans-serif; background-color: #1a1a1a; color: white; text-align: center; padding: 20px; }
+        h1 { color: #00ffcc; text-shadow: 2px 2px 4px #000; }
+        #webcam-container { margin: 20px auto; border: 4px solid #00ffcc; border-radius: 15px; width: 300px; height: 300px; overflow: hidden; }
+        #label-container { font-size: 28px; font-weight: bold; color: #ffff00; margin-top: 20px; height: 50px; }
+        button { background-color: #00ffcc; color: black; border: none; padding: 15px 40px; font-size: 20px; border-radius: 50px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 15px rgba(0,255,204,0.3); }
+        button:active { transform: scale(0.95); }
+    </style>
+</head>
+<body>
+    <h1>👁️ AI කෘතිම ඇස</h1>
+    <p>සල්ලි නෝට්ටුව කැමරාවට පෙන්වන්න</p>
+    
+    <button type="button" onclick="init()">ඇස පණගන්වන්න</button>
+
+    <div id="webcam-container"></div>
+    <div id="label-container">සූදානම් වෙමින්...</div>
+
+    <script type="text/javascript">
+        // මම පුහුණු කරපු සම්පූර්ණ නෝට්ටු එකතුව සහිත මොළයේ ලින්ක් එක
+        const URL = "https://teachablemachine.withgoogle.com/models/HqL7Y1N9t/"; 
+
+        let model, webcam, labelContainer, maxPredictions;
+
+        async function init() {
+            document.getElementById("label-container").innerHTML = "මොළය අවදි වේ...";
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            model = await tmImage.load(modelURL, metadataURL);
+            maxPredictions = model.getTotalClasses();
+
+            const flip = true; 
+            webcam = new tmImage.Webcam(300, 300, flip); 
+            await webcam.setup(); 
+            await webcam.play();
+            window.requestAnimationFrame(loop);
+
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            labelContainer = document.getElementById("label-container");
+        }
+
+        async function loop() {
+            webcam.update(); 
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        let lastSpoken = "";
+
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            let bestMatch = { className: "", probability: 0 };
+
+            for (let i = 0; i < maxPredictions; i++) {
+                if (prediction[i].probability > bestMatch.probability) {
+                    bestMatch = prediction[i];
+                }
+            }
+
+            if (bestMatch.probability > 0.85) { // 85% කට වඩා ෂුවර් නම් විතරක් ශබ්ද කරන්න
+                let note = bestMatch.className;
+                labelContainer.innerHTML = "පෙනෙන්නේ: රුපියල් " + note;
+
+                if (lastSpoken !== note) {
+                    speakNote(note);
+                    lastSpoken = note;
+                }
+            }
+        }
+
+        function speakNote(note) {
+            let msg = new SpeechSynthesisUtterance();
+            let textToSay = "";
+
+            // නෝට්ටු වල නම් සිංහලට හැරවීම
+            switch(note) {
+                case "20": textToSay = "රුපියල් විස්සයි"; break;
+                case "50": textToSay = "රුපියල් පනහයි"; break;
+                case "100": textToSay = "රුපියල් සියයයි"; break;
+                case "500": textToSay = "රුපියල් පන්සියයයි"; break;
+                case "1000": textToSay = "රුපියල් එක්දහසයි"; break;
+                case "2000": textToSay = "රුපියල් දෙදහසයි"; break;
+                case "5000": textToSay = "රුපියල් පන්දහසයි"; break;
+                default: textToSay = note;
+            }
+
+            msg.text = textToSay;
+            msg.lang = 'si-LK'; // සිංහල භාෂාව
+            msg.rate = 0.9;     // කතා කරන වේගය
+            window.speechSynthesis.speak(msg);
+        }
+    </script>
+</body>
+</html>
+
