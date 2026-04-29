@@ -1,80 +1,92 @@
+
 <!DOCTYPE html>
 <html lang="si">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI කෘතිම ඇස</title>
+    <title>AI Smart Eye for Blind</title>
     <style>
-        body { font-family: sans-serif; background-color: #1a1a1a; color: white; text-align: center; margin: 0; padding: 20px; }
-        .container { max-width: 500px; margin: auto; }
-        #video-container { width: 100%; border: 3px solid #00ffcc; border-radius: 15px; overflow: hidden; background: black; aspect-ratio: 1/1; position: relative; }
-        video { width: 100%; height: 100%; object-fit: cover; }
-        button { background: #00ffcc; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 50px; cursor: pointer; margin: 20px 0; box-shadow: 0 4px 15px rgba(0,255,204,0.3); }
-        #status { background: #333; padding: 10px; border-radius: 10px; margin-top: 10px; border-left: 5px solid #00ffcc; }
-        #error-log { color: #ff5555; font-size: 12px; margin-top: 10px; text-align: left; background: #000; padding: 5px; border-radius: 5px; display: none; }
+        body { font-family: sans-serif; background: #000; color: #fff; text-align: center; margin: 0; overflow: hidden; }
+        #video { width: 100vw; height: 70vh; object-fit: cover; border-bottom: 4px solid #00ffcc; }
+        .info-panel { height: 30vh; padding: 15px; background: #111; display: flex; flex-direction: column; justify-content: center; }
+        #status { font-size: 24px; color: #00ffcc; font-weight: bold; }
+        #description { font-size: 18px; color: #ccc; margin-top: 10px; }
+        .btn-start { background: #00ffcc; color: #000; border: none; padding: 20px; font-size: 22px; font-weight: bold; width: 90%; border-radius: 10px; margin-top: 10px; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>👁️ AI කෘතිම ඇස</h1>
-        <p>සල්ලි නෝට්ටුව කැමරාවට පෙන්වන්න</p>
-        
-        <div id="video-container">
-            <video id="video" autoplay playsinline></video>
-        </div>
 
-        <button id="start-btn">ඇස පණගන්වන්න</button>
-        
-        <div id="status">මොළය සූදානම් කරමින්...</div>
-        <div id="error-log" id="error-display"></div>
+    <video id="video" autoplay playsinline></video>
+    
+    <div class="info-panel">
+        <div id="status">ඇස පණගන්වන්න...</div>
+        <div id="description">වටපිටාව විස්තර කිරීමට සූදානම්.</div>
+        <button class="btn-start" id="start-btn">ඇස පණගන්වන්න</button>
     </div>
 
-    <script>
-        const video = document.getElementById('video');
-        const startBtn = document.getElementById('start-btn');
-        const status = document.getElementById('status');
-        const errorLog = document.getElementById('error-log');
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
 
-        function logError(msg) {
-            errorLog.style.display = 'block';
-            errorLog.innerHTML += "> " + msg + "<br>";
+    <script>
+        let model;
+        const video = document.getElementById('video');
+        const statusText = document.getElementById('status');
+        const descText = document.getElementById('description');
+        const startBtn = document.getElementById('start-btn');
+
+        async function initAI() {
+            statusText.innerText = "මොළය අවදි වෙමින්...";
+            model = await mobilenet.load();
+            statusText.innerText = "දැන් ඇස පණගන්වන්න";
         }
 
         startBtn.addEventListener('click', async () => {
-            status.innerText = "කැමරාව සොයමින්...";
-            logError("කැමරාවට සම්බන්ධ වීමට උත්සාහ කරයි...");
-
-            const constraints = {
-                video: { facingMode: { exact: "environment" } } // පිටුපස කැමරාව ඉල්ලයි
-            };
-
             try {
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment" } 
+                });
                 video.srcObject = stream;
-                status.innerText = "ඇස විවෘතයි! නෝට්ටුව පෙන්වන්න...";
-                logError("සාර්ථකයි!");
+                startBtn.style.display = 'none';
+                statusText.innerText = "පරීක්ෂා කරමින්...";
+                setInterval(analyzeFrame, 3000); // සෑම තත්පර 3කට වරක්ම වටපිටාව බලයි
             } catch (err) {
-                logError("ප්‍රශ්නය: " + err.name);
-                
-                if (err.name === "OverconstrainedError" || err.name === "NotFoundError") {
-                    logError("පිටුපස කැමරාව හමු වුනේ නැත. සාමාන්‍ය කැමරාව උත්සාහ කරයි...");
-                    try {
-                        const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                        video.srcObject = fallbackStream;
-                        status.innerText = "ඇස විවෘතයි (මුහුණත)!";
-                    } catch (e) {
-                        status.innerText = "කැමරාව පණගැන්විය නොහැක!";
-                        logError("අවසාන දෝෂය: " + e.message);
-                    }
-                } else if (err.name === "NotAllowedError") {
-                    status.innerText = "කැමරා අවසරය නැත (Permission Denied)!";
-                    logError("කරුණාකර Browser එකේ Camera Permission ලබා දෙන්න.");
-                } else {
-                    status.innerText = "අදෘශ්‍යමාන දෝෂයකි!";
-                    logError(err.message);
-                }
+                alert("කැමරාව වැඩ නැත: " + err.message);
             }
         });
+
+        async function analyzeFrame() {
+            if (!model) return;
+            const predictions = await model.classify(video);
+            
+            // ඉහළම ප්‍රතිඵලය ලබා ගැනීම
+            const topResult = predictions[0];
+            let message = "";
+
+            // සරල සිංහල පරිවර්තනය (උදාහරණ කිහිපයක්)
+            const label = topResult.className.toLowerCase();
+            
+            if(label.includes('money') || label.includes('paper')) {
+                message = "මුදල් නෝට්ටුවක් විය හැක";
+            } else if(label.includes('person') || label.includes('man')) {
+                message = "මිනිසෙකු පෙනේ";
+            } else if(label.includes('chair') || label.includes('table')) {
+                message = "ගෘහ භාණ්ඩ පෙනේ";
+            } else {
+                message = "මෙය " + topResult.className + " එකක් විය හැක";
+            }
+
+            descText.innerText = message;
+            speak(message);
+        }
+
+        function speak(text) {
+            const synth = window.speechSynthesis;
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'si-LK';
+            synth.speak(utterance);
+        }
+
+        initAI();
     </script>
 </body>
 </html>
